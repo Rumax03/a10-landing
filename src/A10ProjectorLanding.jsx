@@ -286,7 +286,7 @@ export default function A10ProjectorLanding() {
             {/* CTAs */}
             <div style={{ marginTop: 32, display: "flex", flexWrap: "wrap", gap: 12 }}>
               <a
-                href="https://www.wildberries.ru"
+                href="https://www.wildberries.ru/catalog/454435141/detail.aspx"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -812,7 +812,7 @@ export default function A10ProjectorLanding() {
             </div>
 
             <a
-              href="https://www.wildberries.ru"
+              href="https://www.wildberries.ru/catalog/454435141/detail.aspx"
               target="_blank"
               rel="noopener noreferrer"
               style={{
