@@ -33,6 +33,372 @@ function Reveal({ children, delay = 0, className = "" }) {
   );
 }
 
+/* ─── Video Player Component ─── */
+function VideoSection() {
+  const [isPlaying, setIsPlaying]   = useState(false);
+  const [progress,  setProgress]    = useState(0);
+  const [hovered,   setHovered]     = useState(false);
+  const [muted,     setMuted]       = useState(false);
+  const intervalRef = useRef(null);
+  const playerRef   = useRef(null);
+  const [secRef, inView] = useInView(0.15);
+
+  const DURATION     = 154; // 2:34 – swap when real video lands
+  const currentSec   = Math.round((progress / 100) * DURATION);
+  const fmt          = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (isPlaying) {
+      intervalRef.current = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 100) { setIsPlaying(false); return 0; }
+          return p + 100 / DURATION / 4;
+        });
+      }, 250);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [isPlaying]);
+
+  const handleProgressClick = (e) => {
+    const rect  = e.currentTarget.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    setProgress(Math.max(0, Math.min(100, ratio * 100)));
+  };
+
+  const handleFullscreen = () => {
+    if (playerRef.current?.requestFullscreen) playerRef.current.requestFullscreen();
+  };
+
+  return (
+    <section id="video" ref={secRef} style={{ padding: "80px 24px 120px" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+
+        {/* Section header */}
+        <div style={{
+          textAlign: "center", marginBottom: 52,
+          transition: "opacity 0.7s ease, transform 0.7s ease",
+          opacity: inView ? 1 : 0,
+          transform: inView ? "translateY(0)" : "translateY(36px)",
+        }}>
+          <p style={{ fontSize: 12, letterSpacing: "0.22em", color: "#a78bfa", fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Проектор в действии</p>
+          <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 2.9rem)", fontWeight: 900, margin: "0 0 14px", letterSpacing: "-0.03em" }}>
+            Смотри как это работает
+          </h2>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", maxWidth: 420, margin: "0 auto" }}>
+            Картинка до 150 дюймов на любой стене — всего за 30 секунд
+          </p>
+        </div>
+
+        {/* Player wrapper */}
+        <div style={{
+          transition: "opacity 0.8s ease 200ms, transform 0.8s ease 200ms",
+          opacity: inView ? 1 : 0,
+          transform: inView ? "translateY(0)" : "translateY(48px)",
+        }}>
+
+          {/* Outer glow ring */}
+          <div style={{
+            position: "relative",
+            borderRadius: 28,
+            padding: 2,
+            background: isPlaying
+              ? "linear-gradient(135deg, rgba(139,92,246,0.6), rgba(59,130,246,0.5), rgba(99,102,241,0.6))"
+              : "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.2))",
+            transition: "background 1s ease",
+            boxShadow: isPlaying
+              ? "0 0 80px rgba(139,92,246,0.35), 0 0 160px rgba(99,102,241,0.18)"
+              : "0 0 40px rgba(139,92,246,0.15)",
+          }}>
+
+            {/* Player container */}
+            <div
+              ref={playerRef}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              style={{
+                position: "relative",
+                width: "100%",
+                aspectRatio: "16/9",
+                borderRadius: 26,
+                overflow: "hidden",
+                background: "#06060e",
+                cursor: "pointer",
+              }}
+              onClick={() => setIsPlaying((p) => !p)}
+            >
+              {/* ── ANIMATED CINEMATIC BACKGROUND ── */}
+              {/* Base gradient */}
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #0a0520 0%, #070514 35%, #030210 70%, #060412 100%)" }} />
+
+              {/* Orb 1 – purple, top-left */}
+              <div className="vid-orb1" style={{
+                position: "absolute", width: "55%", height: "90%",
+                top: "-20%", left: "-10%", borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(139,92,246,0.28) 0%, rgba(99,102,241,0.12) 40%, transparent 70%)",
+                filter: "blur(48px)",
+              }} />
+
+              {/* Orb 2 – blue, bottom-right */}
+              <div className="vid-orb2" style={{
+                position: "absolute", width: "60%", height: "85%",
+                bottom: "-25%", right: "-15%", borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(59,130,246,0.22) 0%, rgba(37,99,235,0.1) 45%, transparent 70%)",
+                filter: "blur(56px)",
+              }} />
+
+              {/* Orb 3 – accent, center shifting */}
+              <div className="vid-orb3" style={{
+                position: "absolute", width: "40%", height: "60%",
+                top: "20%", left: "30%", borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 65%)",
+                filter: "blur(40px)",
+              }} />
+
+              {/* Projection beam – when playing */}
+              {isPlaying && (
+                <div style={{
+                  position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
+                  width: "30%", height: "100%",
+                  background: "linear-gradient(to top, rgba(139,92,246,0.08) 0%, transparent 60%)",
+                  clipPath: "polygon(35% 100%, 65% 100%, 100% 0%, 0% 0%)",
+                  opacity: 0.6,
+                }} />
+              )}
+
+              {/* Floating particles */}
+              {[...Array(16)].map((_, i) => (
+                <div key={i} className={`vid-particle vid-p${(i % 4) + 1}`} style={{
+                  position: "absolute",
+                  width:  i % 3 === 0 ? 2.5 : 1.5,
+                  height: i % 3 === 0 ? 2.5 : 1.5,
+                  borderRadius: "50%",
+                  background: i % 2 === 0 ? "rgba(167,139,250,0.7)" : "rgba(147,197,253,0.5)",
+                  top:  `${8 + (i * 19.3 % 78)}%`,
+                  left: `${3 + (i * 23.7 % 93)}%`,
+                }} />
+              ))}
+
+              {/* Subtle scanlines */}
+              <div style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px)",
+                mixBlendMode: "multiply",
+              }} />
+
+              {/* Cinematic letterbox bars */}
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "7%", background: "rgba(0,0,0,0.88)", zIndex: 3 }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "7%", background: "rgba(0,0,0,0.88)", zIndex: 3 }} />
+
+              {/* Vignette */}
+              <div style={{
+                position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
+                background: "radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)",
+              }} />
+
+              {/* ── "COMING SOON" cinema label ── */}
+              <div style={{
+                position: "absolute", top: "12%", left: "50%", transform: "translateX(-50%)",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                zIndex: 4, pointerEvents: "none",
+              }}>
+                <div style={{
+                  padding: "4px 14px", borderRadius: 4,
+                  background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.3)",
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
+                  color: "rgba(167,139,250,0.7)", textTransform: "uppercase",
+                }}>
+                  {isPlaying ? "▶ Воспроизведение" : "Обзор проектора · 2:34"}
+                </div>
+              </div>
+
+              {/* ── CENTRAL PLAY BUTTON ── */}
+              {!isPlaying && (
+                <div style={{
+                  position: "absolute", inset: 0, display: "flex",
+                  alignItems: "center", justifyContent: "center", zIndex: 5,
+                }}>
+                  {/* Pulse rings */}
+                  <div className="play-ring play-ring-1" style={{
+                    position: "absolute", width: 120, height: 120, borderRadius: "50%",
+                    border: "1.5px solid rgba(139,92,246,0.25)",
+                  }} />
+                  <div className="play-ring play-ring-2" style={{
+                    position: "absolute", width: 90, height: 90, borderRadius: "50%",
+                    border: "1.5px solid rgba(139,92,246,0.35)",
+                  }} />
+
+                  {/* Button */}
+                  <div className="play-btn" style={{
+                    width: 72, height: 72, borderRadius: "50%",
+                    background: "linear-gradient(135deg, rgba(139,92,246,0.9), rgba(99,102,241,0.85))",
+                    border: "1.5px solid rgba(167,139,250,0.5)",
+                    boxShadow: "0 0 32px rgba(139,92,246,0.55), 0 0 64px rgba(99,102,241,0.22), inset 0 1px 0 rgba(255,255,255,0.15)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    backdropFilter: "blur(10px)",
+                    transition: "transform 0.2s, box-shadow 0.2s",
+                  }}>
+                    <Play style={{ width: 26, height: 26, fill: "#fff", color: "#fff", marginLeft: 4 }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Pause indicator (center, brief) */}
+              {isPlaying && hovered && (
+                <div style={{
+                  position: "absolute", inset: 0, display: "flex",
+                  alignItems: "center", justifyContent: "center", zIndex: 5,
+                }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: "50%",
+                    background: "rgba(7,7,15,0.65)", backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                  }}>
+                    <div style={{ width: 4, height: 20, borderRadius: 2, background: "#fff" }} />
+                    <div style={{ width: 4, height: 20, borderRadius: 2, background: "#fff" }} />
+                  </div>
+                </div>
+              )}
+
+              {/* ── CONTROLS BAR ── */}
+              <div style={{
+                position: "absolute", bottom: "7%", left: 0, right: 0, zIndex: 6,
+                padding: "14px 20px 10px",
+                background: "linear-gradient(to top, rgba(4,4,12,0.92) 0%, transparent 100%)",
+                transition: "opacity 0.3s ease",
+                opacity: hovered || !isPlaying ? 1 : 0,
+              }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Progress bar */}
+                <div
+                  onClick={handleProgressClick}
+                  style={{
+                    width: "100%", height: 4, borderRadius: 2,
+                    background: "rgba(255,255,255,0.15)",
+                    cursor: "pointer", marginBottom: 12, position: "relative",
+                  }}
+                >
+                  {/* Buffered (fake) */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, height: "100%",
+                    width: `${Math.min(100, progress + 12)}%`,
+                    borderRadius: 2, background: "rgba(255,255,255,0.15)",
+                    transition: "width 0.5s ease",
+                  }} />
+                  {/* Played */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, height: "100%",
+                    width: `${progress}%`,
+                    borderRadius: 2,
+                    background: "linear-gradient(to right, #8b5cf6, #6366f1)",
+                    transition: "width 0.25s linear",
+                  }} />
+                  {/* Thumb */}
+                  <div style={{
+                    position: "absolute", top: "50%",
+                    left: `${progress}%`, transform: "translate(-50%, -50%)",
+                    width: 12, height: 12, borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 0 6px rgba(139,92,246,0.8)",
+                    transition: "left 0.25s linear",
+                  }} />
+                </div>
+
+                {/* Controls row */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  {/* Left */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    {/* Play/Pause */}
+                    <button
+                      onClick={() => setIsPlaying((p) => !p)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", padding: 4, display: "flex", alignItems: "center" }}
+                    >
+                      {isPlaying
+                        ? <span style={{ display: "flex", gap: 3 }}><span style={{ width: 3, height: 14, background: "#fff", borderRadius: 1, display: "block" }} /><span style={{ width: 3, height: 14, background: "#fff", borderRadius: 1, display: "block" }} /></span>
+                        : <Play style={{ width: 16, height: 16, fill: "#fff" }} />
+                      }
+                    </button>
+
+                    {/* Volume */}
+                    <button
+                      onClick={() => setMuted((m) => !m)}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex", alignItems: "center" }}
+                    >
+                      {muted
+                        ? <Volume2 style={{ width: 16, height: 16, opacity: 0.35 }} />
+                        : <Volume2 style={{ width: 16, height: 16 }} />
+                      }
+                    </button>
+
+                    {/* Time */}
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em", fontFamily: "monospace" }}>
+                      {fmt(currentSec)} / {fmt(DURATION)}
+                    </span>
+                  </div>
+
+                  {/* Right */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    {/* Quality badge */}
+                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.6)" }}>
+                      HD
+                    </span>
+                    {/* Fullscreen */}
+                    <button
+                      onClick={handleFullscreen}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex", alignItems: "center" }}
+                    >
+                      {/* Custom fullscreen icon */}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── VIDEO TAG (uncomment + add src when video.mp4 is ready) ── */}
+              {/*
+              <video
+                ref={playerRef}
+                src="/video.mp4"
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
+                playsInline
+              />
+              */}
+
+            </div>{/* /player container */}
+          </div>{/* /outer glow ring */}
+
+          {/* Below-player info row */}
+          <div style={{
+            marginTop: 20, display: "flex", alignItems: "center",
+            justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+            padding: "0 4px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px rgba(52,211,153,0.8)", animation: "pulse-dot 2s ease-in-out infinite" }} />
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
+                {isPlaying ? "Идёт воспроизведение · A10 Projector" : "Нажми Play чтобы увидеть проектор в работе"}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 16 }}>
+              {["Full HD", "Smart TV", "Автофокус"].map((t) => (
+                <span key={t} style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ color: "rgba(139,92,246,0.6)" }}>✦</span>{t}
+                </span>
+              ))}
+            </div>
+          </div>
+
+        </div>{/* /player wrapper */}
+      </div>
+    </section>
+  );
+}
+
 /* ─── Data ─── */
 const WB_LINK = "https://www.wildberries.ru/catalog/454435141/detail.aspx";
 
@@ -465,6 +831,9 @@ export default function A10ProjectorLanding() {
         </div>
       </div>
 
+      {/* ══════════ VIDEO ══════════ */}
+      <VideoSection />
+
       {/* ══════════ ADVANTAGES ══════════ */}
       <section id="advantages" style={{ padding: "120px 24px" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -746,11 +1115,74 @@ export default function A10ProjectorLanding() {
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
         * { box-sizing: border-box; }
+
+        /* ── Hero scroll bounce ── */
         @keyframes bounce {
           0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(7px); }
+          50%       { transform: translateX(-50%) translateY(7px); }
         }
+
+        /* ── Video orb animations ── */
+        @keyframes orb1 {
+          0%   { transform: translate(0,    0)    scale(1); }
+          33%  { transform: translate(6%,  -8%)   scale(1.08); }
+          66%  { transform: translate(-4%,  5%)   scale(0.94); }
+          100% { transform: translate(0,    0)    scale(1); }
+        }
+        @keyframes orb2 {
+          0%   { transform: translate(0,   0)   scale(1); }
+          33%  { transform: translate(-7%, 6%)  scale(1.06); }
+          66%  { transform: translate(5%, -4%)  scale(0.96); }
+          100% { transform: translate(0,   0)   scale(1); }
+        }
+        @keyframes orb3 {
+          0%   { transform: translate(0,   0)   scale(1)    rotate(0deg); }
+          50%  { transform: translate(-8%, 6%)  scale(1.12) rotate(180deg); }
+          100% { transform: translate(0,   0)   scale(1)    rotate(360deg); }
+        }
+
+        .vid-orb1 { animation: orb1 14s ease-in-out infinite; }
+        .vid-orb2 { animation: orb2 17s ease-in-out infinite; }
+        .vid-orb3 { animation: orb3 22s ease-in-out infinite; }
+
+        /* ── Floating particles ── */
+        @keyframes p1 { 0%,100%{transform:translate(0,0)opacity:.6}50%{transform:translate(8px,-12px)opacity:1} }
+        @keyframes p2 { 0%,100%{transform:translate(0,0)opacity:.4}50%{transform:translate(-10px,8px)opacity:.9} }
+        @keyframes p3 { 0%,100%{transform:translate(0,0)opacity:.7}50%{transform:translate(6px,10px)opacity:.4} }
+        @keyframes p4 { 0%,100%{transform:translate(0,0)opacity:.5}50%{transform:translate(-7px,-9px)opacity:1} }
+
+        .vid-p1 { animation: p1 4.2s ease-in-out infinite; }
+        .vid-p2 { animation: p2 5.8s ease-in-out infinite 0.7s; }
+        .vid-p3 { animation: p3 3.9s ease-in-out infinite 1.4s; }
+        .vid-p4 { animation: p4 6.3s ease-in-out infinite 2.1s; }
+
+        /* ── Play button pulse ── */
+        @keyframes play-ring {
+          0%   { transform: scale(1);   opacity: 0.6; }
+          100% { transform: scale(1.9); opacity: 0; }
+        }
+        .play-ring-1 { animation: play-ring 2.2s ease-out infinite; }
+        .play-ring-2 { animation: play-ring 2.2s ease-out infinite 0.7s; }
+
+        @keyframes play-glow {
+          0%,100% { box-shadow: 0 0 32px rgba(139,92,246,.55), 0 0 64px rgba(99,102,241,.22), inset 0 1px 0 rgba(255,255,255,.15); }
+          50%     { box-shadow: 0 0 52px rgba(139,92,246,.75), 0 0 96px rgba(99,102,241,.35), inset 0 1px 0 rgba(255,255,255,.15); }
+        }
+        .play-btn { animation: play-glow 2.4s ease-in-out infinite; }
+        .play-btn:hover {
+          transform: scale(1.1) !important;
+          box-shadow: 0 0 60px rgba(139,92,246,.85), 0 0 110px rgba(99,102,241,.4) !important;
+        }
+
+        /* ── Status dot ── */
+        @keyframes pulse-dot {
+          0%,100% { opacity:1; }
+          50%     { opacity:0.4; }
+        }
+
+        /* ── Responsive ── */
         @media (max-width: 768px) {
           .hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; padding-top: 88px !important; }
         }
