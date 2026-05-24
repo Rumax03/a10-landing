@@ -76,7 +76,7 @@ const reviews = [
 
 const useCases = [
   { icon: <Play className="w-5 h-5" />, title: "Кино и сериалы", desc: "Netflix, YouTube, Кинопоиск прямо с Android 13 — без лишней приставки" },
-  { icon: <Gamepad2 className="w-5 h-5" />, title: "Игры", desc: "HDMI-вход для приставки или ПК. Экран 100"+ — другие ощущения" },
+  { icon: <Gamepad2 className="w-5 h-5" />, title: "Игры", desc: "HDMI-вход для приставки или ПК. Большой экран — другие ощущения" },
   { icon: <MonitorSmartphone className="w-5 h-5" />, title: "Зеркалирование", desc: "Miracast с телефона или HDMI с ноутбука — за 10 секунд" },
   { icon: <Sun className="w-5 h-5" />, title: "Проекция на потолок", desc: "Ляг поудобнее — поверни объектив и смотри лёжа" },
 ];
