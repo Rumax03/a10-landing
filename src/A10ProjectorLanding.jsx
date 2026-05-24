@@ -35,365 +35,299 @@ function Reveal({ children, delay = 0, className = "" }) {
 
 /* ─── Video Player Component ─── */
 function VideoSection() {
-  const [isPlaying, setIsPlaying]   = useState(false);
-  const [progress,  setProgress]    = useState(0);
-  const [hovered,   setHovered]     = useState(false);
-  const [muted,     setMuted]       = useState(false);
-  const intervalRef = useRef(null);
-  const playerRef   = useRef(null);
-  const [secRef, inView] = useInView(0.15);
+  const videoRef          = useRef(null);
+  const wrapRef           = useRef(null);
+  const hideTimer         = useRef(null);
+  const [secRef, inView]  = useInView(0.12);
 
-  const DURATION     = 154; // 2:34 – swap when real video lands
-  const currentSec   = Math.round((progress / 100) * DURATION);
-  const fmt          = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const [playing,  setPlaying]  = useState(true);   // autoplay starts muted
+  const [muted,    setMuted]    = useState(true);    // must start muted for autoplay
+  const [progress, setProgress] = useState(0);       // 0–100
+  const [duration, setDuration] = useState(0);
+  const [current,  setCurrent]  = useState(0);
+  const [showCtrl, setShowCtrl] = useState(false);
+  const [loaded,   setLoaded]   = useState(false);
 
+  const fmt = (s) => isNaN(s) || s === 0 ? "0:00" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  /* ── wire up real video events ── */
   useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setProgress((p) => {
-          if (p >= 100) { setIsPlaying(false); return 0; }
-          return p + 100 / DURATION / 4;
-        });
-      }, 250);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [isPlaying]);
+    const v = videoRef.current;
+    if (!v) return;
+    const onMeta  = () => setDuration(v.duration);
+    const onTime  = () => { setCurrent(v.currentTime); setProgress(v.currentTime / v.duration * 100); };
+    const onPlay  = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onLoad  = () => setLoaded(true);
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("timeupdate",     onTime);
+    v.addEventListener("play",           onPlay);
+    v.addEventListener("pause",          onPause);
+    v.addEventListener("canplay",        onLoad);
+    return () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("timeupdate",     onTime);
+      v.removeEventListener("play",           onPlay);
+      v.removeEventListener("pause",          onPause);
+      v.removeEventListener("canplay",        onLoad);
+    };
+  }, []);
 
-  const handleProgressClick = (e) => {
-    const rect  = e.currentTarget.getBoundingClientRect();
-    const ratio = (e.clientX - rect.left) / rect.width;
-    setProgress(Math.max(0, Math.min(100, ratio * 100)));
+  const togglePlay = (e) => {
+    e?.stopPropagation();
+    const v = videoRef.current;
+    if (!v) return;
+    v.paused ? v.play() : v.pause();
   };
 
-  const handleFullscreen = () => {
-    if (playerRef.current?.requestFullscreen) playerRef.current.requestFullscreen();
+  const toggleMute = (e) => {
+    e.stopPropagation();
+    const v = videoRef.current;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  };
+
+  const seek = (e) => {
+    e.stopPropagation();
+    const rect  = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    videoRef.current.currentTime = ratio * videoRef.current.duration;
+  };
+
+  const fullscreen = (e) => {
+    e.stopPropagation();
+    const el = wrapRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) el.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  };
+
+  const revealControls = () => {
+    setShowCtrl(true);
+    clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => setShowCtrl(false), 3000);
   };
 
   return (
-    <section id="video" ref={secRef} style={{ padding: "80px 24px 120px" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <section id="video" ref={secRef} style={{ padding: "0 0 120px", position: "relative", overflow: "hidden" }}>
 
-        {/* Section header */}
+      {/* Section ambient background */}
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: "10%", left: "-5%", width: "50%", height: "80%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.09) 0%, transparent 70%)", filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", bottom: "5%", right: "-5%", width: "45%", height: "70%", borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", filter: "blur(80px)" }} />
+      </div>
+
+      <div style={{ maxWidth: 1060, margin: "0 auto", padding: "0 24px", position: "relative" }}>
+
+        {/* ── Section header ── */}
         <div style={{
-          textAlign: "center", marginBottom: 52,
+          textAlign: "center", paddingTop: 100, marginBottom: 56,
           transition: "opacity 0.7s ease, transform 0.7s ease",
-          opacity: inView ? 1 : 0,
-          transform: inView ? "translateY(0)" : "translateY(36px)",
+          opacity: inView ? 1 : 0, transform: inView ? "none" : "translateY(32px)",
         }}>
-          <p style={{ fontSize: 12, letterSpacing: "0.22em", color: "#a78bfa", fontWeight: 700, textTransform: "uppercase", marginBottom: 14 }}>Проектор в действии</p>
-          <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 2.9rem)", fontWeight: 900, margin: "0 0 14px", letterSpacing: "-0.03em" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 100, marginBottom: 20, background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.25)" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#a78bfa", display: "inline-block", animation: "pulse-dot 2s ease-in-out infinite" }} />
+            <span style={{ fontSize: 12, color: "#c4b5fd", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase" }}>Проектор в действии</span>
+          </div>
+          <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 3rem)", fontWeight: 900, margin: "0 0 14px", letterSpacing: "-0.03em" }}>
             Смотри как это работает
           </h2>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", maxWidth: 420, margin: "0 auto" }}>
-            Картинка до 150 дюймов на любой стене — всего за 30 секунд
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.42)", maxWidth: 400, margin: "0 auto" }}>
+            Картинка до 150 дюймов на любой стене — готово за 30 секунд
           </p>
         </div>
 
-        {/* Player wrapper */}
+        {/* ── TV MOCKUP ── */}
         <div style={{
-          transition: "opacity 0.8s ease 200ms, transform 0.8s ease 200ms",
-          opacity: inView ? 1 : 0,
-          transform: inView ? "translateY(0)" : "translateY(48px)",
+          transition: "opacity 0.9s ease 150ms, transform 0.9s ease 150ms",
+          opacity: inView ? 1 : 0, transform: inView ? "none" : "translateY(56px)",
         }}>
 
-          {/* Outer glow ring */}
+          {/* Ambient screen glow (floor) */}
           <div style={{
-            position: "relative",
-            borderRadius: 28,
-            padding: 2,
-            background: isPlaying
-              ? "linear-gradient(135deg, rgba(139,92,246,0.6), rgba(59,130,246,0.5), rgba(99,102,241,0.6))"
-              : "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.2))",
-            transition: "background 1s ease",
-            boxShadow: isPlaying
-              ? "0 0 80px rgba(139,92,246,0.35), 0 0 160px rgba(99,102,241,0.18)"
-              : "0 0 40px rgba(139,92,246,0.15)",
+            position: "absolute", left: "10%", right: "10%",
+            height: 120, bottom: -30, zIndex: 0,
+            background: playing
+              ? "radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.32) 0%, rgba(59,130,246,0.18) 45%, transparent 80%)"
+              : "radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.14) 0%, transparent 70%)",
+            filter: "blur(32px)",
+            transition: "background 1.2s ease",
+          }} />
+
+          {/* TV frame outer glow */}
+          <div style={{
+            position: "relative", borderRadius: 22,
+            boxShadow: playing
+              ? "0 0 0 1px rgba(139,92,246,0.35), 0 32px 80px rgba(99,102,241,0.28), 0 0 120px rgba(139,92,246,0.12)"
+              : "0 0 0 1px rgba(255,255,255,0.08), 0 24px 60px rgba(0,0,0,0.55)",
+            transition: "box-shadow 1.2s ease",
           }}>
 
-            {/* Player container */}
-            <div
-              ref={playerRef}
-              onMouseEnter={() => setHovered(true)}
-              onMouseLeave={() => setHovered(false)}
-              style={{
-                position: "relative",
-                width: "100%",
-                aspectRatio: "16/9",
-                borderRadius: 26,
-                overflow: "hidden",
-                background: "#06060e",
-                cursor: "pointer",
-              }}
-              onClick={() => setIsPlaying((p) => !p)}
-            >
-              {/* ── ANIMATED CINEMATIC BACKGROUND ── */}
-              {/* Base gradient */}
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, #0a0520 0%, #070514 35%, #030210 70%, #060412 100%)" }} />
+            {/* TV bezel */}
+            <div style={{
+              background: "linear-gradient(180deg, #1a1a2a 0%, #111120 100%)",
+              borderRadius: 22,
+              padding: "10px 10px 0",
+              border: "1px solid rgba(255,255,255,0.07)",
+            }}>
 
-              {/* Orb 1 – purple, top-left */}
-              <div className="vid-orb1" style={{
-                position: "absolute", width: "55%", height: "90%",
-                top: "-20%", left: "-10%", borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(139,92,246,0.28) 0%, rgba(99,102,241,0.12) 40%, transparent 70%)",
-                filter: "blur(48px)",
-              }} />
-
-              {/* Orb 2 – blue, bottom-right */}
-              <div className="vid-orb2" style={{
-                position: "absolute", width: "60%", height: "85%",
-                bottom: "-25%", right: "-15%", borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(59,130,246,0.22) 0%, rgba(37,99,235,0.1) 45%, transparent 70%)",
-                filter: "blur(56px)",
-              }} />
-
-              {/* Orb 3 – accent, center shifting */}
-              <div className="vid-orb3" style={{
-                position: "absolute", width: "40%", height: "60%",
-                top: "20%", left: "30%", borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 65%)",
-                filter: "blur(40px)",
-              }} />
-
-              {/* Projection beam – when playing */}
-              {isPlaying && (
-                <div style={{
-                  position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
-                  width: "30%", height: "100%",
-                  background: "linear-gradient(to top, rgba(139,92,246,0.08) 0%, transparent 60%)",
-                  clipPath: "polygon(35% 100%, 65% 100%, 100% 0%, 0% 0%)",
-                  opacity: 0.6,
-                }} />
-              )}
-
-              {/* Floating particles */}
-              {[...Array(16)].map((_, i) => (
-                <div key={i} className={`vid-particle vid-p${(i % 4) + 1}`} style={{
-                  position: "absolute",
-                  width:  i % 3 === 0 ? 2.5 : 1.5,
-                  height: i % 3 === 0 ? 2.5 : 1.5,
-                  borderRadius: "50%",
-                  background: i % 2 === 0 ? "rgba(167,139,250,0.7)" : "rgba(147,197,253,0.5)",
-                  top:  `${8 + (i * 19.3 % 78)}%`,
-                  left: `${3 + (i * 23.7 % 93)}%`,
-                }} />
-              ))}
-
-              {/* Subtle scanlines */}
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none",
-                backgroundImage: "repeating-linear-gradient(to bottom, transparent 0px, transparent 3px, rgba(0,0,0,0.07) 3px, rgba(0,0,0,0.07) 4px)",
-                mixBlendMode: "multiply",
-              }} />
-
-              {/* Cinematic letterbox bars */}
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "7%", background: "rgba(0,0,0,0.88)", zIndex: 3 }} />
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "7%", background: "rgba(0,0,0,0.88)", zIndex: 3 }} />
-
-              {/* Vignette */}
-              <div style={{
-                position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2,
-                background: "radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)",
-              }} />
-
-              {/* ── "COMING SOON" cinema label ── */}
-              <div style={{
-                position: "absolute", top: "12%", left: "50%", transform: "translateX(-50%)",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-                zIndex: 4, pointerEvents: "none",
-              }}>
-                <div style={{
-                  padding: "4px 14px", borderRadius: 4,
-                  background: "rgba(139,92,246,0.18)", border: "1px solid rgba(139,92,246,0.3)",
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.2em",
-                  color: "rgba(167,139,250,0.7)", textTransform: "uppercase",
-                }}>
-                  {isPlaying ? "▶ Воспроизведение" : "Обзор проектора · 2:34"}
-                </div>
-              </div>
-
-              {/* ── CENTRAL PLAY BUTTON ── */}
-              {!isPlaying && (
-                <div style={{
-                  position: "absolute", inset: 0, display: "flex",
-                  alignItems: "center", justifyContent: "center", zIndex: 5,
-                }}>
-                  {/* Pulse rings */}
-                  <div className="play-ring play-ring-1" style={{
-                    position: "absolute", width: 120, height: 120, borderRadius: "50%",
-                    border: "1.5px solid rgba(139,92,246,0.25)",
-                  }} />
-                  <div className="play-ring play-ring-2" style={{
-                    position: "absolute", width: 90, height: 90, borderRadius: "50%",
-                    border: "1.5px solid rgba(139,92,246,0.35)",
-                  }} />
-
-                  {/* Button */}
-                  <div className="play-btn" style={{
-                    width: 72, height: 72, borderRadius: "50%",
-                    background: "linear-gradient(135deg, rgba(139,92,246,0.9), rgba(99,102,241,0.85))",
-                    border: "1.5px solid rgba(167,139,250,0.5)",
-                    boxShadow: "0 0 32px rgba(139,92,246,0.55), 0 0 64px rgba(99,102,241,0.22), inset 0 1px 0 rgba(255,255,255,0.15)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    backdropFilter: "blur(10px)",
-                    transition: "transform 0.2s, box-shadow 0.2s",
-                  }}>
-                    <Play style={{ width: 26, height: 26, fill: "#fff", color: "#fff", marginLeft: 4 }} />
-                  </div>
-                </div>
-              )}
-
-              {/* Pause indicator (center, brief) */}
-              {isPlaying && hovered && (
-                <div style={{
-                  position: "absolute", inset: 0, display: "flex",
-                  alignItems: "center", justifyContent: "center", zIndex: 5,
-                }}>
-                  <div style={{
-                    width: 64, height: 64, borderRadius: "50%",
-                    background: "rgba(7,7,15,0.65)", backdropFilter: "blur(8px)",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  }}>
-                    <div style={{ width: 4, height: 20, borderRadius: 2, background: "#fff" }} />
-                    <div style={{ width: 4, height: 20, borderRadius: 2, background: "#fff" }} />
-                  </div>
-                </div>
-              )}
-
-              {/* ── CONTROLS BAR ── */}
-              <div style={{
-                position: "absolute", bottom: "7%", left: 0, right: 0, zIndex: 6,
-                padding: "14px 20px 10px",
-                background: "linear-gradient(to top, rgba(4,4,12,0.92) 0%, transparent 100%)",
-                transition: "opacity 0.3s ease",
-                opacity: hovered || !isPlaying ? 1 : 0,
-              }}
-                onClick={(e) => e.stopPropagation()}
+              {/* ── SCREEN ── */}
+              <div
+                ref={wrapRef}
+                onClick={togglePlay}
+                onMouseMove={revealControls}
+                onMouseLeave={() => { clearTimeout(hideTimer.current); setShowCtrl(false); }}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  aspectRatio: "16/9",
+                  borderRadius: "14px 14px 0 0",
+                  overflow: "hidden",
+                  background: "#000",
+                  cursor: playing ? "none" : "pointer",
+                  display: "block",
+                }}
               >
-                {/* Progress bar */}
-                <div
-                  onClick={handleProgressClick}
+                {/* ── Real video ── */}
+                <video
+                  ref={videoRef}
+                  src="/video.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
                   style={{
-                    width: "100%", height: 4, borderRadius: 2,
-                    background: "rgba(255,255,255,0.15)",
-                    cursor: "pointer", marginBottom: 12, position: "relative",
+                    position: "absolute", inset: 0,
+                    width: "100%", height: "100%",
+                    objectFit: "cover",
+                    zIndex: 1,
+                    opacity: loaded ? 1 : 0,
+                    transition: "opacity 0.6s ease",
+                  }}
+                />
+
+                {/* Animated bg — shown while video loads or as fallback */}
+                <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+                  <div style={{ position: "absolute", inset: 0, background: "linear-gradient(155deg, #0a0520 0%, #070415 40%, #030210 100%)" }} />
+                  <div className="vid-orb1" style={{ position: "absolute", width: "60%", height: "90%", top: "-20%", left: "-10%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)", filter: "blur(50px)" }} />
+                  <div className="vid-orb2" style={{ position: "absolute", width: "55%", height: "80%", bottom: "-20%", right: "-10%", borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%)", filter: "blur(60px)" }} />
+                  <div className="vid-orb3" style={{ position: "absolute", width: "40%", height: "55%", top: "25%", left: "32%", borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 65%)", filter: "blur(40px)" }} />
+                  {[...Array(14)].map((_, i) => (
+                    <div key={i} className={`vid-p${(i % 4) + 1}`} style={{ position: "absolute", width: i % 3 === 0 ? 2.5 : 1.5, height: i % 3 === 0 ? 2.5 : 1.5, borderRadius: "50%", background: i % 2 === 0 ? "rgba(167,139,250,0.7)" : "rgba(147,197,253,0.5)", top: `${8 + (i * 19.3 % 78)}%`, left: `${4 + (i * 23.7 % 91)}%` }} />
+                  ))}
+                </div>
+
+                {/* Screen sheen/glare */}
+                <div style={{ position: "absolute", inset: 0, zIndex: 4, pointerEvents: "none", background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.12) 100%)" }} />
+
+                {/* Vignette */}
+                <div style={{ position: "absolute", inset: 0, zIndex: 3, pointerEvents: "none", background: "radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0,0,0,0.45) 100%)" }} />
+
+                {/* ── Muted badge (top-right) ── */}
+                {muted && (
+                  <div
+                    onClick={toggleMute}
+                    style={{ position: "absolute", top: 14, right: 14, zIndex: 8, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", transition: "opacity 0.3s", opacity: showCtrl || !playing ? 1 : 0 }}>
+                    <Volume2 style={{ width: 13, height: 13, color: "rgba(255,255,255,0.6)", opacity: 0.4 }} />
+                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", fontWeight: 600 }}>Нажми для звука</span>
+                  </div>
+                )}
+
+                {/* ── PLAY BUTTON (center, shows when paused) ── */}
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 7, pointerEvents: "none", opacity: !playing ? 1 : 0, transition: "opacity 0.25s ease" }}>
+                  <div className="play-ring play-ring-1" style={{ position: "absolute", width: 130, height: 130, borderRadius: "50%", border: "1.5px solid rgba(139,92,246,0.2)" }} />
+                  <div className="play-ring play-ring-2" style={{ position: "absolute", width: 100, height: 100, borderRadius: "50%", border: "1.5px solid rgba(139,92,246,0.3)" }} />
+                  <div className="play-btn" style={{ width: 76, height: 76, borderRadius: "50%", background: "linear-gradient(135deg, rgba(139,92,246,0.92), rgba(79,70,229,0.88))", border: "1.5px solid rgba(167,139,250,0.45)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(12px)", boxShadow: "0 0 36px rgba(139,92,246,0.6), 0 0 72px rgba(99,102,241,0.25), inset 0 1px 0 rgba(255,255,255,0.18)" }}>
+                    <Play style={{ width: 28, height: 28, fill: "#fff", color: "#fff", marginLeft: 5 }} />
+                  </div>
+                </div>
+
+                {/* ── CONTROLS BAR (glassmorphism, auto-hide) ── */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 8,
+                    padding: "40px 18px 16px",
+                    background: "linear-gradient(to top, rgba(3,2,12,0.92) 0%, rgba(3,2,12,0.6) 55%, transparent 100%)",
+                    backdropFilter: "blur(0px)",
+                    transition: "opacity 0.35s ease",
+                    opacity: showCtrl || !playing ? 1 : 0,
                   }}
                 >
-                  {/* Buffered (fake) */}
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, height: "100%",
-                    width: `${Math.min(100, progress + 12)}%`,
-                    borderRadius: 2, background: "rgba(255,255,255,0.15)",
-                    transition: "width 0.5s ease",
-                  }} />
-                  {/* Played */}
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, height: "100%",
-                    width: `${progress}%`,
-                    borderRadius: 2,
-                    background: "linear-gradient(to right, #8b5cf6, #6366f1)",
-                    transition: "width 0.25s linear",
-                  }} />
-                  {/* Thumb */}
-                  <div style={{
-                    position: "absolute", top: "50%",
-                    left: `${progress}%`, transform: "translate(-50%, -50%)",
-                    width: 12, height: 12, borderRadius: "50%",
-                    background: "#fff",
-                    boxShadow: "0 0 6px rgba(139,92,246,0.8)",
-                    transition: "left 0.25s linear",
-                  }} />
-                </div>
-
-                {/* Controls row */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  {/* Left */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    {/* Play/Pause */}
-                    <button
-                      onClick={() => setIsPlaying((p) => !p)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", padding: 4, display: "flex", alignItems: "center" }}
-                    >
-                      {isPlaying
-                        ? <span style={{ display: "flex", gap: 3 }}><span style={{ width: 3, height: 14, background: "#fff", borderRadius: 1, display: "block" }} /><span style={{ width: 3, height: 14, background: "#fff", borderRadius: 1, display: "block" }} /></span>
-                        : <Play style={{ width: 16, height: 16, fill: "#fff" }} />
-                      }
-                    </button>
-
-                    {/* Volume */}
-                    <button
-                      onClick={() => setMuted((m) => !m)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex", alignItems: "center" }}
-                    >
-                      {muted
-                        ? <Volume2 style={{ width: 16, height: 16, opacity: 0.35 }} />
-                        : <Volume2 style={{ width: 16, height: 16 }} />
-                      }
-                    </button>
-
-                    {/* Time */}
-                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em", fontFamily: "monospace" }}>
-                      {fmt(currentSec)} / {fmt(DURATION)}
-                    </span>
+                  {/* Progress track */}
+                  <div
+                    onClick={seek}
+                    style={{ width: "100%", height: 3, borderRadius: 3, background: "rgba(255,255,255,0.18)", cursor: "pointer", position: "relative", marginBottom: 12 }}
+                  >
+                    <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${Math.min(100, progress + 8)}%`, borderRadius: 3, background: "rgba(255,255,255,0.12)" }} />
+                    <div style={{ position: "absolute", top: 0, left: 0, height: "100%", width: `${progress}%`, borderRadius: 3, background: "linear-gradient(to right, #a78bfa, #6366f1)" }} />
+                    <div style={{ position: "absolute", top: "50%", left: `${progress}%`, transform: "translate(-50%,-50%)", width: 11, height: 11, borderRadius: "50%", background: "#fff", boxShadow: "0 0 8px rgba(167,139,250,0.9)" }} />
                   </div>
 
-                  {/* Right */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                    {/* Quality badge */}
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.6)" }}>
-                      HD
-                    </span>
-                    {/* Fullscreen */}
-                    <button
-                      onClick={handleFullscreen}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.7)", padding: 4, display: "flex", alignItems: "center" }}
-                    >
-                      {/* Custom fullscreen icon */}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
+                  {/* Row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      {/* Play/Pause */}
+                      <button onClick={togglePlay} style={{ background: "none", border: "none", cursor: "pointer", color: "#fff", padding: 2, display: "flex" }}>
+                        {playing
+                          ? <span style={{ display:"flex",gap:3 }}><span style={{width:3,height:14,borderRadius:1,background:"#fff",display:"block"}} /><span style={{width:3,height:14,borderRadius:1,background:"#fff",display:"block"}} /></span>
+                          : <Play style={{ width: 15, height: 15, fill: "#fff" }} />}
+                      </button>
+                      {/* Mute */}
+                      <button onClick={toggleMute} style={{ background: "none", border: "none", cursor: "pointer", color: muted ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.75)", padding: 2, display: "flex" }}>
+                        <Volume2 style={{ width: 15, height: 15 }} />
+                      </button>
+                      {/* Time */}
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                        {fmt(current)} / {fmt(duration)}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", padding: "2px 6px", borderRadius: 3, border: "1px solid rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.55)" }}>HD</span>
+                      <button onClick={fullscreen} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.65)", padding: 2, display: "flex" }}>
+                        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+              </div>{/* /screen */}
+
+              {/* TV bottom bar */}
+              <div style={{ height: 14, background: "linear-gradient(180deg, #14142a 0%, #0e0e1e 100%)", borderRadius: "0 0 4px 4px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 40, height: 3, borderRadius: 2, background: "rgba(255,255,255,0.06)" }} />
               </div>
+            </div>{/* /TV bezel */}
 
-              {/* ── VIDEO TAG (uncomment + add src when video.mp4 is ready) ── */}
-              {/*
-              <video
-                ref={playerRef}
-                src="/video.mp4"
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 1 }}
-                playsInline
-              />
-              */}
+            {/* TV stand neck */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ width: 80, height: 18, background: "linear-gradient(180deg, #111120 0%, #0c0c1a 100%)", borderRadius: "0 0 6px 6px", boxShadow: "0 4px 12px rgba(0,0,0,0.5)" }} />
+            </div>
+            {/* TV stand base */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ width: 180, height: 8, borderRadius: "0 0 12px 12px", background: "linear-gradient(180deg, #0e0e1e 0%, #090915 100%)", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" }} />
+            </div>
 
-            </div>{/* /player container */}
-          </div>{/* /outer glow ring */}
+          </div>{/* /TV frame outer glow */}
 
-          {/* Below-player info row */}
-          <div style={{
-            marginTop: 20, display: "flex", alignItems: "center",
-            justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-            padding: "0 4px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 6px rgba(52,211,153,0.8)", animation: "pulse-dot 2s ease-in-out infinite" }} />
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                {isPlaying ? "Идёт воспроизведение · A10 Projector" : "Нажми Play чтобы увидеть проектор в работе"}
+          {/* ── Below-player info row ── */}
+          <div style={{ marginTop: 32, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, padding: "0 2px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#34d399", display: "inline-block", boxShadow: "0 0 6px rgba(52,211,153,0.85)", animation: "pulse-dot 2s ease-in-out infinite" }} />
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.38)" }}>
+                {playing ? "Автовоспроизведение · A10 Projector" : "Нажми для воспроизведения"}
               </span>
             </div>
-            <div style={{ display: "flex", gap: 16 }}>
-              {["Full HD", "Smart TV", "Автофокус"].map((t) => (
-                <span key={t} style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ color: "rgba(139,92,246,0.6)" }}>✦</span>{t}
+            <div style={{ display: "flex", gap: 18 }}>
+              {["Full HD", "Smart TV", "Автофокус"].map(t => (
+                <span key={t} style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ color: "rgba(139,92,246,0.55)" }}>✦</span>{t}
                 </span>
               ))}
             </div>
           </div>
 
-        </div>{/* /player wrapper */}
+        </div>{/* /TV mockup */}
       </div>
     </section>
   );
@@ -813,6 +747,9 @@ export default function A10ProjectorLanding() {
         </div>
       </section>
 
+      {/* ══════════ VIDEO ══════════ */}
+      <VideoSection />
+
       {/* ══════════ STRIP ══════════ */}
       <div style={{ borderTop: "1px solid rgba(139,92,246,0.1)", borderBottom: "1px solid rgba(139,92,246,0.1)", background: "rgba(139,92,246,0.04)", padding: "18px 24px", overflowX: "auto" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", gap: 36, justifyContent: "center", minWidth: "max-content" }}>
@@ -830,9 +767,6 @@ export default function A10ProjectorLanding() {
           ))}
         </div>
       </div>
-
-      {/* ══════════ VIDEO ══════════ */}
-      <VideoSection />
 
       {/* ══════════ ADVANTAGES ══════════ */}
       <section id="advantages" style={{ padding: "120px 24px" }}>
