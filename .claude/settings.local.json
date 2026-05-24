@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh --version)",
+      "PowerShell(winget install --id GitHub.cli --silent --accept-package-agreements --accept-source-agreements)",
+      "PowerShell(gh auth status)",
+      "Bash(git init *)",
+      "Bash(cp \"c:/Users/16mak/AppData/Local/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/local-agent-mode-sessions/8fe87488-fde5-40ca-8d33-92c34345c5af/f043c0bc-9bc2-459c-b114-0bb0b9dd724c/local_af00796d-9c6d-4c65-9771-4cb424e9ba2f/outputs/A10ProjectorLanding.jsx\" \"c:/Users/16mak/Pictures/a10-landing/src/A10ProjectorLanding.jsx\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\16mak\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\8fe87488-fde5-40ca-8d33-92c34345c5af\\f043c0bc-9bc2-459c-b114-0bb0b9dd724c\\local_af00796d-9c6d-4c65-9771-4cb424e9ba2f\\outputs"
+    ]
+  }
+}
